@@ -11,24 +11,35 @@ Notes:
 Need to delete some csv files if we are totally 100% not using the data and variables anymore
 '''
 class CleanerABC(ABC):
-        
-    @abstractmethod
-    def read_file(name:str):
-        pass
     
+    path_to_files = './raw_data/'
+            
     @abstractmethod
     def cleanup() -> pd.DataFrame: 
         pass
+    
+    def read_csv(filename) -> pd.DataFrame:
+        df = pd.read_csv(self.path_to_files + filename)
+        return df
+
+    def read_xls (filename) -> pd.DataFrame:
+        df = pd.read_xls(self.path_to_files + filename)
+        return df
         
         
 class FAOStatCleaner(CleanerABC):
     
     def __init__(self):
-        self.list_filename = ['FAOSTAT_agricultural_area.csv', 'FAOSTAT_employment_in_agriculture.csv', 'FAOSTAT_production.csv']
+        self.dict_filename = {
+            'TLU': 'FAOSTAT_agricultural_area.csv',
+            'POC': 'FAOSTAT_production.csv'
+        }
+    
     
     #write brief description of what TLU means in the equation
     def __extract_TLU(self) -> pd.DataFrame:
-        
+        df = pd.read_csv(self.path_to_files + self.dict_filename['TLU'])
+        print(df)
         pass
     
     def __extract_POC(self) -> pd.DataFrame:
@@ -37,6 +48,7 @@ class FAOStatCleaner(CleanerABC):
             
     
     def cleanup(self):
+        self.__extract_TLU()
         pass
 
 class IMFStatCleaner(CleanerABC):
@@ -50,6 +62,7 @@ class IMFStatCleaner(CleanerABC):
 
     
     def cleanup(self):
+        pass
         
     
 class UNStatCleaner(CleanerABC):
@@ -80,8 +93,14 @@ class MACROTRENDCleaner(CleanerABC):
     
 
 class Cleaner:
-    pass
+    
+    def __init__(self):
+        self.FAOStatCleaner = FAOStatCleaner()
+    
+    def run(self):
+        self.FAOStatCleaner.cleanup()
 
 
 if __name__ == '__main__':
+    Cleaner().run()
     pass
