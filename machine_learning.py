@@ -125,10 +125,6 @@ def gradient_descent_linreg(X, y, beta, alpha, num_iters):
         J_storage.append(compute_cost_linreg(X, y, beta))
     return beta, J_storage
 
-df = pd.read_csv("2D_DATA.csv")
-feature_col = ["TEMP", "TLU", "RAIN", "POP", "DEBT", "ECO"]
-target_col = ["POC"]
-
 def linreg(df, feature_col, target_col, iterations=1500, alpha=0.01, random_state=100, test_size=0.3, sample=1):
     df_features, df_target = (df.loc[:, feature_col].copy(), df.loc[:, target_col].copy())
 
@@ -173,6 +169,7 @@ def k_cross_validation(df, feature_col, target_col, k=10, iterations=1500, alpha
         train = pd.concat(tlst)
         #display(test)
         #print(train.shape)
+        df_features = df.loc[:, feature_col]
         df_features_train = train.loc[:, feature_col].copy()
         df_target_train = train.loc[:, target_col].copy()
         df_features_test = test.loc[:, feature_col].copy()
@@ -194,5 +191,10 @@ def k_cross_validation(df, feature_col, target_col, k=10, iterations=1500, alpha
         beta_lst.append(beta)
     return beta_lst
 
+df = pd.read_csv("2D_DATA.csv")
+feature_col = ["TEMP", "TLU", "RAIN", "POP", "DEBT", "ECO"]
+target_col = ["POC"]
+beta_l = k_cross_validation(df, feature_col, target_col, k=10, iterations=1500, alpha=0.01)
 
-k_cross_validation(df, feature_col, target_col, k=10, iterations=1500, alpha=0.01)
+print(beta_l)
+print(len(beta_l))

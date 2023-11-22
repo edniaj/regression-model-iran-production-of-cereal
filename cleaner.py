@@ -71,11 +71,11 @@ class FAOStatCleaner(CleanerABC):
         df_csv = df_csv.loc[df_csv['Item'] != 'Permanent meadows and pastures']
         df_csv = df_csv.loc[(df_csv['Year'] >= 1992) & (df_csv['Year'] <= 2021)]
                 
-        df_extract_TLU = df_csv.groupby('Year')['Value'].sum().reset_index(name='TLU (k)')
+        df_extract_TLU = df_csv.groupby('Year')['Value'].sum().reset_index(name='TLU')
         #transform
         #1. convert from 1unit to 1000 
         print(df_extract_TLU.columns)
-        df_extract_TLU['TLU (k)'] /= 1000
+        df_extract_TLU['TLU'] /= 1000
         self.list_dataframe_to_merge.append(df_extract_TLU)
         return df_extract_TLU       
             
@@ -97,13 +97,13 @@ class FAOStatCleaner(CleanerABC):
         df_csv = self.read_csv(filename)
 
         df_csv = df_csv.loc[(df_csv['Element'] == 'Production') & (df_csv['Year']>= 1992) & (df_csv['Year'] <= 2021), ['Year','Value']]     
-        df_csv['POC (M)'] = df_csv['Value']
+        df_csv['POC'] = df_csv['Value']
         del df_csv['Value']
         df_extract_POC = df_csv
 
         #transform
         #1 unit to 1,000,000 unit
-        df_csv['POC (M)'] /= 1000000
+        df_csv['POC'] /= 1000000
         self.list_dataframe_to_merge.append(df_extract_POC)
 
         return df_extract_POC
@@ -188,15 +188,15 @@ class UNStatCleaner(CleanerABC):
         
         df_csv = df_csv.loc[df_csv['Year(s)'].between(1992,2021), ['Year(s)', 'Value']]
 
-        df_csv.rename(columns={'Year(s)': 'Year', 'Value': '(POPUL (M) )^2'}, inplace=True)
+        df_csv.rename(columns={'Year(s)': 'Year', 'Value': 'POP'}, inplace=True)
         
         df_extract_POP = df_csv        
         
         #transform
         # 1. Change population unites from 1 thousand to 1 million
-        df_extract_POP['(POPUL (M) )^2'] /= 1000
+        df_extract_POP['POP'] /= 1000
         # 2. Squaring it
-        df_extract_POP['(POPUL (M) )^2'] *= df_extract_POP['(POPUL (M) )^2']
+        df_extract_POP['POP'] *= df_extract_POP['POP']
 
         return df_extract_POP
 
@@ -222,13 +222,13 @@ class WORLDBANKGROUPCleaner(CleanerABC):
         filename = self.dict_filename['RAIN']
         df_csv = self.read_csv(filename)
         df_csv.drop('5-yr smooth', axis=1, inplace=True)
-        df_csv.rename(columns={'Category': 'Year', 'Annual Mean': 'ln(RAIN)'}, inplace=True)
+        df_csv.rename(columns={'Category': 'Year', 'Annual Mean': 'RAIN'}, inplace=True)
         df_extract_RAIN = df_csv.loc[(df_csv['Year']>= 1992 ) & (df_csv['Year']<=2021 )]
         
         #Transform
         #1. ln data
         for index, row in df_extract_RAIN.iterrows():
-            df_extract_RAIN.at[index, 'ln(RAIN)'] = np.log(row['ln(RAIN)'])
+            df_extract_RAIN.at[index, 'RAIN'] = math.log(row['RAIN'])
         
         return df_extract_RAIN
         
@@ -238,13 +238,13 @@ class WORLDBANKGROUPCleaner(CleanerABC):
         df_csv = self.read_csv(filename)
         
         df_csv.drop('5-yr smooth', axis=1, inplace=True)
-        df_csv.rename(columns={'Category': 'Year', 'Annual Mean': 'ln(TEMP)'}, inplace=True)
+        df_csv.rename(columns={'Category': 'Year', 'Annual Mean': 'TEMP'}, inplace=True)
         df_extract_TEMP = df_csv.loc[(df_csv['Year']>= 1992 ) & (df_csv['Year']<=2021 )]
         
         #transform data
-        #1. ln(temp)
+        #1. ln TEMP
         for index, row in df_extract_TEMP.iterrows():
-            df_extract_TEMP.at[index,'ln(TEMP)'] = np.log(row['ln(TEMP)'])
+            df_extract_TEMP.at[index,'TEMP'] = math.log(row['TEMP'])
         return df_extract_TEMP
     
     def cleanup(self):
@@ -268,12 +268,12 @@ class MACROTRENDCleaner(CleanerABC):
         filename = self.dict_filename['ECO']
         df_xls = self.read_xls(filename)
         
-        df_xls.rename(columns={'Economic growth (%)': 'abs(ECO (%)'}, inplace=True)
+        df_xls.rename(columns={'Economic growth (%)': 'ECO'}, inplace=True)
         df_extract_ECO = df_xls
         
         #transform data
         #1. absolute(ECO)
-        df_extract_ECO['abs(ECO (%)'] = np.abs(df_extract_ECO['abs(ECO (%)'])
+        df_extract_ECO['ECO'] = round(np.abs(df_extract_ECO['ECO']), 6)
         
         return df_extract_ECO
             
