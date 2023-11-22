@@ -32,6 +32,7 @@ class RegressionUtils():
         dfout = (df - np.array(columns_means)) / np.array(columns_stds)
         
         return dfout, columns_means, columns_stds
+    
     def prepare_feature(self, df_feature):
         if isinstance(df_feature, pd.DataFrame):
             np_feature = df_feature.to_numpy()
@@ -45,7 +46,6 @@ class RegressionUtils():
         feature = np_feature.reshape(-1, cols)
         X = np.concatenate((np.ones((feature.shape[0], 1)), feature), axis=1)
         return X
-    
     def prepare_target(self, df_target):
         if isinstance(df_target, pd.DataFrame):
             np_target = df_target.to_numpy()
@@ -97,28 +97,68 @@ class RegressionUtils():
 
 class RegressionEvaluation():
 
+    def __init__(self):
+        self.list_r2_score = []
     def r2_score(self, y, ypred):
-        ssres = np.matmul((y - ypred).T, (y - ypred))
-        sstot = np.matmul((y - np.mean(y)).T, (y - np.mean(y)))
-        return 1 - (ssres / sstot)[0][0]
+        if ~isinstance(ypred, pd.DataFrame):
+            ypred = pd.DataFrame(ypred)
+        
+        ypred.rename(columns={0:'POC'}, inplace=True)
+               
+        # print('ypred shape ', ypred.shape)
+        # print('y shape : ', y.shape)
+        
+        y['POC'].astype(float)
+        ypred['POC'].astype(float)
+        
+        #residual sum of squares
+        y_minus_ypred = y - ypred
+        ssres = np.matmul(y_minus_ypred.T, y_minus_ypred)
+        
+        y_minus_mean = y - np.mean(y)
+        #total sum square
+        sstot = np.matmul(y_minus_mean.T, y_minus_mean)        
+        ssres_divide_sstot = ssres/sstot
+        
+        r_square_value = 1 - ssres_divide_sstot.loc['POC','POC']
+        self.list_r2_score.append(r_square_value)
+
+        return r_square_value
+    
+    # def r2_score(self, y: np.ndarray, ypred: np.ndarray) -> np.ndarray:
+    #     """Computes the R2 coefficient of determination.
+        
+    #     For K given actual/predicted target values
+    #     """ 
+
+    #     y = y.to_numpy()
+    #     y_mean = np.mean(y)
+    #     print('y mean : ',y_mean)
+    #     print('ypred: ', ypred)
+    #     r2_value = 1 - np.sum((y - ypred) * (y - ypred)) / np.sum((y - y_mean) * (y - y_mean))
+    #     print('r2_value ', r2_value)
+    #     return 1 - np.sum((y - ypred) * (y - ypred)) / np.sum((y - y_mean) * (y - y_mean))
+    
     def mean_squared_error(self, target, pred):
         m = target.shape[0]
         err = target - pred
         return np.matmul(err.T, err)[0][0] / m
+    
     def compute_cost_linreg(self, X, y, beta):
         J = 0
         m = len(y)
         y_cap = np.matmul(X, beta) #calc_linreg(X, beta)
         J = (1 / (2 * m)) * np.matmul((y_cap - y).T, (y_cap - y))
         return J[0][0]
+    
     def gradient_descent_linreg(self, X, y, beta, alpha, num_iters):
         m = len(y)
         J_storage = []
         for _ in range(num_iters):
-            pred = calc_linreg(X, beta)
+            pred = self.calc_linreg(X, beta)
             error = pred - y
             beta = beta - alpha / m * np.matmul(X.T, error)
-            J_storage.append(compute_cost_linreg(X, y, beta))
+            J_storage.append(self.compute_cost_linreg(X, y, beta))
         return beta, J_storage
 
     
@@ -126,8 +166,14 @@ class RegressionEvaluation():
 class RegressionModel(RegressionUtils, RegressionEvaluation):
     
     def __init__(self):
+        super().__init__()
         self.utils = RegressionUtils()
         
+        df_kfold_columns = ["CONSTANT","TEMP", "TLU", "RAIN", "POP", "DEBT", "ECO","MSE","RSQUARE"]
+        self.df_kfold = pd.DataFrame(df_kfold_columns)
+        
+    def write_beta_list_to_csv(self, array_beta):
+        pass
 
     def linreg(self, df, feature_col, target_col, iterations=1500, alpha=0.01, random_state=100, test_size=0.3, sample=1):
         df_features, df_target = (df.loc[:, feature_col].copy(), df.loc[:, target_col].copy())
@@ -144,7 +190,7 @@ class RegressionModel(RegressionUtils, RegressionEvaluation):
         return beta
 
 
-    def split_data_k_cross(df, random_state=None, k=10):
+    def split_data_k_cross(self,df, random_state=None, k=10):
         
         if random_state is not None:
             np.random.seed(random_state)
@@ -156,8 +202,8 @@ class RegressionModel(RegressionUtils, RegressionEvaluation):
         
         return folds
 
-    def k_cross_validation(df, feature_col, target_col, k=10, iterations=1500, alpha=0.01):
-        folds = split_data_k_cross(df)
+    def k_cross_validation(self,df, feature_col, target_col, k=10, iterations=1500, alpha=0.01):
+        folds = self.split_data_k_cross(df)
         beta_lst = []
         ddfold = {}
         for i in range(k):
@@ -192,6 +238,9 @@ class RegressionModel(RegressionUtils, RegressionEvaluation):
 
             # call the predict() method
             pred = self.predict_linreg(df_features_test, beta)
+            self.r2_score(df_target_test, pred)
+            # Let's store the values inside a dataframe so that we can output into a csv
+            
 
             beta_lst.append(beta)
         return beta_lst
@@ -200,9 +249,11 @@ class RegressionModel(RegressionUtils, RegressionEvaluation):
             df = pd.read_csv("2D_DATA.csv")
             feature_col = ["TEMP", "TLU", "RAIN", "POP", "DEBT", "ECO"]
             target_col = ["POC"]
-            beta_l = k_cross_validation(df, feature_col, target_col, k=10, iterations=1500, alpha=0.01)    
-            print(beta_l)
-            print(len(beta_l))
+            beta_l = self.k_cross_validation(df, feature_col, target_col, k=10, iterations=1500, alpha=0.01)    
+            print(self.list_r2_score)
+            self.write_beta_list_to_csv(beta_l)
+            
+            
             
 if __name__ == '__main__':
     RegressionModel().run_k_cross_validation()
