@@ -126,7 +126,7 @@ def gradient_descent_linreg(X, y, beta, alpha, num_iters):
     return beta, J_storage
 
 df = pd.read_csv("2D_DATA.csv")
-feature_col = ["TEMP", "TLU", "RAIN", "POPUL", "DEBT", "ECO"]
+feature_col = ["TEMP", "TLU", "RAIN", "POP", "DEBT", "ECO"]
 target_col = ["POC"]
 
 def linreg(df, feature_col, target_col, iterations=1500, alpha=0.01, random_state=100, test_size=0.3, sample=1):
@@ -195,6 +195,4 @@ def k_cross_validation(df, feature_col, target_col, k=10, iterations=1500, alpha
     return beta_lst
 
 
-beta = linreg(df, feature_col, target_col, iterations=1500, alpha=0.01, random_state=100, test_size=0.3, sample=1)
-pred = predict_linreg(df_features_test, beta)
 k_cross_validation(df, feature_col, target_col, k=10, iterations=1500, alpha=0.01)

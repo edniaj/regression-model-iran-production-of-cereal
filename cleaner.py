@@ -163,7 +163,7 @@ class UNStatCleaner(CleanerABC):
     def __init__(self):
         
         self.dict_filename = {
-            'POPUL':'UN_population.csv'
+            'POP':'UN_population.csv'
         }
         
         self.list_dataframe_to_merge = []
@@ -173,12 +173,12 @@ class UNStatCleaner(CleanerABC):
     
     def __extract_POPUL(self):
         
-        filename = self.dict_filename['POPUL']
+        filename = self.dict_filename['POP']
         df_csv = self.read_csv(filename)
         
         df_csv = df_csv.loc[df_csv['Year(s)'].between(1992,2021), ['Year(s)', 'Value']]
 
-        df_csv.rename(columns={'Year(s)': 'Year', 'Value': 'POPUL'}, inplace=True)
+        df_csv.rename(columns={'Year(s)': 'Year', 'Value': 'POP'}, inplace=True)
         
         df_extract_POPUL = df_csv        
         return df_extract_POPUL
@@ -285,7 +285,8 @@ class CleanerConcrete():
     
     def run(self):
         df_merged = self.cleanup()
-        df_merged.to_csv('2D_DATA.csv', index=False)
+        df_merged.drop('Year', axis=1, inplace=True)
+        df_merged.to_csv('2d_DATA.csv', index=False)
 
 
 if __name__ == '__main__':
