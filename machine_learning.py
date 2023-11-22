@@ -5,12 +5,41 @@ import seaborn as sns
 
 
 '''
-documentation of classes
-use ABC
-PEP8 naming convention
-type casting
+Class RegressionUtils
+    Provides utility functions
+Class RegressionEvaluation
+    Provides Calculations functions for evaluation metrics and optimzation
+    
+Class RegressionMode(RegressionUtils, RegressionEvaluation)
+    Provides Training functions and building the CSV file 
 '''
 class RegressionUtils():
+    
+    '''
+    Methods:
+        normalize_z(df :pd.DataFrame, columns_means: float, columns_stds: float): /
+                    -> dfout:pd.Dataframe, columns_means:float, columns_stds: float        
+            Normalizes a DataFrame using Z-score normalization. It can use precomputed means and standard deviations if provided.
+        
+        prepare_feature(df_feature: pd.DataFrame): -> pd.DataFrame
+            Prepares the feature matrix for regression by adding a constant column. It handles DataFrame, Series, and NumPy array inputs.
+            
+        prepare_target(df_target: pd.DataFrame): -> pd.DataFrame
+            Converts target data into a suitable format for regression. Works with DataFrame, Series, and NumPy array inputs.
+            
+        get_features_targets(df:pd.DataFrame, feature_names:list[Str], target_names:list[Str]): 
+            Extracts features and targets from a DataFrame based on specified column names.
+            
+        predict_linreg(df_feature: pd.DataFrame, beta: list[float], means: float, stds: float): 
+            Makes predictions using a linear regression model given features, model coefficients, and optional normalization parameters.
+            
+        calc_linreg(X: pd.DataFrame, beta:pd.DataFrame): 
+            Calculates the output of a linear regression equation given a feature matrix and model coefficients.
+        
+        split_data(df_feature: pd.DataFrame, df_target: pd.DataFrame, random_state: float, test_size:): 
+            Splits feature and target data into training and testing sets based on a specified test size and random state.
+    """
+    '''
     
     def normalize_z(self, df, columns_means=None, columns_stds=None):
         if columns_means is None:
@@ -22,16 +51,6 @@ class RegressionUtils():
         dfout = (df - np.array(columns_means)) / np.array(columns_stds)
         
         return dfout, columns_means, columns_stds   
-    def normalize_z(self, df, columns_means=None, columns_stds=None):
-        if columns_means is None:
-            columns_means = df.mean(axis=0)
-
-        if columns_stds is None:
-            columns_stds = df.std(axis=0)
-        
-        dfout = (df - np.array(columns_means)) / np.array(columns_stds)
-        
-        return dfout, columns_means, columns_stds
     
     def prepare_feature(self, df_feature):
         if isinstance(df_feature, pd.DataFrame):
@@ -96,7 +115,26 @@ class RegressionUtils():
         return df_feature_train, df_feature_test, df_target_train, df_target_test
 
 class RegressionEvaluation():
-
+    '''
+    Attributes:
+        list_r2_score : List[float] 
+            This is used for writing into the CSV file for k-fold training, will be used for evaluation report
+        list_mean_square_error : List[float]
+            This is used for writing into the CSV file for k-fold training, will be used for evaluation report
+    
+    Methods:    
+        r2_score(y:pd.DataFrame, ypred: pd.DataFrame) -> float
+            Generate te r2_sccore using the feature and target
+            
+        mean_squared_error(y:pd.DataFrame, ypred: pd.DataFrame) -> float
+            Generate mean square error value
+            
+        compute_cost_linreg(X:pd.DataFrame, ypred: pd.DataFrame, beta: pd.DataFrame) -> float   
+            Compute the cost of the linear regression
+             
+        gradient_descent_linreg(X:pd.DataFrame, y: pd.DataFrame, beta:pd.DataFrame, alpha:float, num_iters:float) -> Tuple(beta: pd.DataFarme, J_storage: list[float])
+            Gradient descent linear regression algorithm
+    '''
     def __init__(self):
         self.list_r2_score = []
         self.list_mean_square_error = []
@@ -169,17 +207,46 @@ class RegressionEvaluation():
     
 
 class RegressionModel(RegressionUtils, RegressionEvaluation):
-    
-    def __init__(self):
-        super().__init__()
-        self.utils = RegressionUtils()
+    '''
+        Context: 
+            Provides Training functions and building the CSV file 
         
+        Attributes: 
+            df_kfold: pd.DataFrame
+                Stores the data collected from the k-fold algorithm
+        
+        Methods:
+            write_beta_list_to_csv(array_beta: List[float]) ->
+                Clean up the beta values before building a dataframe, generate CSV for models by the k-fold algo
+            
+            linreg(df :pd.DataFrame, feature_col: list[Str], target_col: list[Str], k:int, iterations:int, alpha:float) -> float
+                Linear regression using data that will be split into training and test
+            
+            split_data_k_cross(df:pd.DataFrame, random_state:float, k:int) -> np.array
+                Split the DataFrame into k folds for cross-validation, returns A list of DataFrames, each representing a fold.
+            
+            k_cross_validation(df:pd.DataFrame, feature_col: list[Str], target_col: list[Str], k: int, iterations:int, alpha: float) -> List[List[List[int]]]
+                Perform k-fold cross-validation on the given DataFram and return list of model coefficients (beta values) for each fold
+            
+            run_k_cross_validation
+                Run k-fold cross-validation on the dataset specified in the "2D_DATA.csv" file.
+            
+            build_csv_with_kfold
+                Build a CSV file with the results from k-fold cross-validation.
+                This method runs k-fold cross-validation and writes the results, including beta coefficients,
+                R-squared values, and mean squared error, to a CSV file named 'k_fold.csv'.
+
+                
+
+
+            
+    '''
+    def __init__(self):
+        super().__init__()        
         df_kfold_columns = ["CONSTANT","TEMP", "TLU", "RAIN", "POP", "DEBT", "ECO","MSE","RSQUARE"]
         self.df_kfold = pd.DataFrame(df_kfold_columns)
         
     def write_beta_list_to_csv(self, array_beta):
-        print('list r2 score : ', self.list_r2_score)
-        print('list mean square error : ',self.list_mean_square_error)
         
         '''
         clean up multi-dimensional array
@@ -217,12 +284,8 @@ class RegressionModel(RegressionUtils, RegressionEvaluation):
             dict_to_dataframe['MSE_SCORE'].append(self.list_mean_square_error[index])
         
         df_k_fold = pd.DataFrame(dict_to_dataframe)        
-        # print(df_k_fold)
-        df_k_fold.to_csv('k_fold.csv', index=False) #        df_merged.to_csv('2D_DATA.csv', index=False)
-        print('Complete')
+        df_k_fold.to_csv('k_fold.csv', index=False) 
             
-        
-
     def linreg(self, df, feature_col, target_col, iterations=1500, alpha=0.01, random_state=100, test_size=0.3, sample=1):
         df_features, df_target = (df.loc[:, feature_col].copy(), df.loc[:, target_col].copy())
 
@@ -236,7 +299,6 @@ class RegressionModel(RegressionUtils, RegressionEvaluation):
 
         beta, J_storage = self.gradient_descent_linreg(X, target, beta, alpha, iterations)
         return beta
-
 
     def split_data_k_cross(self,df, random_state=None, k=10):
         
