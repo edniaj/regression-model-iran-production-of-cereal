@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from abc import ABC, abstractmethod
+import math
 '''
 write documentation and ABC
 '''
@@ -11,10 +12,11 @@ Notes:
 Need to delete some csv files if we are totally 100% not using the data and variables anymore
 Do we normalize in this file and transform in this file ?
 
+PEP8 NAMING CONVENTION
 '''
 class CleanerABC(ABC):
     
-    path_to_files = './raw_data/'
+    PATH_TO_FILES = './raw_data/'
             
     @abstractmethod
     def cleanup() -> pd.DataFrame: 
@@ -26,11 +28,11 @@ class CleanerABC(ABC):
         
     
     def read_csv(self, filename) -> pd.DataFrame:
-        df = pd.read_csv(self.path_to_files + filename)
+        df = pd.read_csv(self.PATH_TO_FILES + filename)
         return df
 
     def read_xls(self, filename) -> pd.DataFrame:
-        xlsx = pd.ExcelFile(f"{self.path_to_files}{filename}")
+        xlsx = pd.ExcelFile(f"{self.PATH_TO_FILES}{filename}")
         df_xls = pd.read_excel(xlsx)
         return df_xls
         
@@ -69,7 +71,11 @@ class FAOStatCleaner(CleanerABC):
         df_csv = df_csv.loc[df_csv['Item'] != 'Permanent meadows and pastures']
         df_csv = df_csv.loc[(df_csv['Year'] >= 1992) & (df_csv['Year'] <= 2021)]
                 
-        df_extract_TLU = df_csv.groupby('Year')['Value'].sum().reset_index(name='TLU')
+        df_extract_TLU = df_csv.groupby('Year')['Value'].sum().reset_index(name='TLU (k)')
+        #transform
+        #1. convert from 1unit to 1000 
+        print(df_extract_TLU.columns)
+        df_extract_TLU['TLU (k)'] /= 1000
         self.list_dataframe_to_merge.append(df_extract_TLU)
         return df_extract_TLU       
             
@@ -91,9 +97,13 @@ class FAOStatCleaner(CleanerABC):
         df_csv = self.read_csv(filename)
 
         df_csv = df_csv.loc[(df_csv['Element'] == 'Production') & (df_csv['Year']>= 1992) & (df_csv['Year'] <= 2021), ['Year','Value']]     
-        df_csv['POC'] = df_csv['Value']
+        df_csv['POC (M)'] = df_csv['Value']
         del df_csv['Value']
         df_extract_POC = df_csv
+
+        #transform
+        #1 unit to 1,000,000 unit
+        df_csv['POC (M)'] /= 1000000
         self.list_dataframe_to_merge.append(df_extract_POC)
 
         return df_extract_POC
@@ -171,20 +181,27 @@ class UNStatCleaner(CleanerABC):
     def __merge_dataframe(self) -> pd.DataFrame:
         pass
     
-    def __extract_POPUL(self):
+    def __extract_POP(self):
         
         filename = self.dict_filename['POP']
         df_csv = self.read_csv(filename)
         
         df_csv = df_csv.loc[df_csv['Year(s)'].between(1992,2021), ['Year(s)', 'Value']]
 
-        df_csv.rename(columns={'Year(s)': 'Year', 'Value': 'POP'}, inplace=True)
+        df_csv.rename(columns={'Year(s)': 'Year', 'Value': '(POPUL (M) )^2'}, inplace=True)
         
-        df_extract_POPUL = df_csv        
-        return df_extract_POPUL
+        df_extract_POP = df_csv        
+        
+        #transform
+        # 1. Change population unites from 1 thousand to 1 million
+        df_extract_POP['(POPUL (M) )^2'] /= 1000
+        # 2. Squaring it
+        df_extract_POP['(POPUL (M) )^2'] *= df_extract_POP['(POPUL (M) )^2']
+
+        return df_extract_POP
 
     def cleanup(self):
-        return self.__extract_POPUL()
+        return self.__extract_POP()
 
 class WORLDBANKGROUPCleaner(CleanerABC):
     
@@ -205,9 +222,14 @@ class WORLDBANKGROUPCleaner(CleanerABC):
         filename = self.dict_filename['RAIN']
         df_csv = self.read_csv(filename)
         df_csv.drop('5-yr smooth', axis=1, inplace=True)
-        df_csv.rename(columns={'Category': 'Year', 'Annual Mean': 'RAIN'}, inplace=True)
+        df_csv.rename(columns={'Category': 'Year', 'Annual Mean': 'ln(RAIN)'}, inplace=True)
         df_extract_RAIN = df_csv.loc[(df_csv['Year']>= 1992 ) & (df_csv['Year']<=2021 )]
-
+        
+        #Transform
+        #1. ln data
+        for index, row in df_extract_RAIN.iterrows():
+            df_extract_RAIN.at[index, 'ln(RAIN)'] = np.log(row['ln(RAIN)'])
+        
         return df_extract_RAIN
         
     def __extract_TEMP(self):
@@ -216,9 +238,13 @@ class WORLDBANKGROUPCleaner(CleanerABC):
         df_csv = self.read_csv(filename)
         
         df_csv.drop('5-yr smooth', axis=1, inplace=True)
-        df_csv.rename(columns={'Category': 'Year', 'Annual Mean': 'TEMP'}, inplace=True)
+        df_csv.rename(columns={'Category': 'Year', 'Annual Mean': 'ln(TEMP)'}, inplace=True)
         df_extract_TEMP = df_csv.loc[(df_csv['Year']>= 1992 ) & (df_csv['Year']<=2021 )]
-
+        
+        #transform data
+        #1. ln(temp)
+        for index, row in df_extract_TEMP.iterrows():
+            df_extract_TEMP.at[index,'ln(TEMP)'] = np.log(row['ln(TEMP)'])
         return df_extract_TEMP
     
     def cleanup(self):
@@ -242,9 +268,13 @@ class MACROTRENDCleaner(CleanerABC):
         filename = self.dict_filename['ECO']
         df_xls = self.read_xls(filename)
         
-        df_xls.rename(columns={'Economic growth (%)': 'ECO'}, inplace=True)
+        df_xls.rename(columns={'Economic growth (%)': 'abs(ECO (%)'}, inplace=True)
         df_extract_ECO = df_xls
-
+        
+        #transform data
+        #1. absolute(ECO)
+        df_extract_ECO['abs(ECO (%)'] = np.abs(df_extract_ECO['abs(ECO (%)'])
+        
         return df_extract_ECO
             
     def __merge_dataframe(self) -> pd.DataFrame:
