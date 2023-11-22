@@ -297,12 +297,18 @@ class CleanerConcrete():
         
     def __merge_dataframe(self) -> pd.DataFrame:
         
-        merged_df = pd.merge(self.list_dataframe_to_merge[0], self.list_dataframe_to_merge[1], on='Year')
+        df_merged = pd.merge(self.list_dataframe_to_merge[0], self.list_dataframe_to_merge[1], on='Year')
         
         for index in range(2,len(self.list_dataframe_to_merge)):
-            merged_df = pd.merge(merged_df, self.list_dataframe_to_merge[index], on='Year')
+            df_merged = pd.merge(df_merged, self.list_dataframe_to_merge[index], on='Year')
         
-        return merged_df
+        df_merged.drop('Year', axis=1, inplace=True)
+        
+        #Had a lot of issues with numpy.matmul because of the column order
+        column_order = ['POC', 'TEMP', 'TLU', 'RAIN', 'POP', 'DEBT', 'ECO']
+        
+        df_merged_reordered = df_merged[column_order]
+        return df_merged_reordered
            
     
     def cleanup(self):
@@ -315,8 +321,7 @@ class CleanerConcrete():
     
     def run(self):
         df_merged = self.cleanup()
-        df_merged.drop('Year', axis=1, inplace=True)
-        df_merged.to_csv('2d_DATA.csv', index=False)
+        df_merged.to_csv('2D_DATA.csv', index=False)
 
 
 if __name__ == '__main__':
