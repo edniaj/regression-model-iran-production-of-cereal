@@ -3,29 +3,42 @@ import pandas as pd
 from abc import ABC, abstractmethod
 import math
 '''
-write documentation and ABC
-'''
-
-
-'''
-Notes:
-Need to delete some csv files if we are totally 100% not using the data and variables anymore
-Do we normalize in this file and transform in this file ?
-
-PEP8 NAMING CONVENTION
+This file serves the purpose of extracting raw files from the raw_data folder, aggregate the data and build a CSV file for the purpose of machine learning
 '''
 class CleanerABC(ABC):
+    """
+    Abstract base class for data cleaning operations
     
+    Context:
+    Due to the problem statement (agriculture in Iran), there are limited datasets scattered around different online databases / reports.
+    We have created an ABC to standardised the cleaning operations from files with different structures and formats due to the database
+    
+    Attributes:
+    PATH_TO_FILES (str)
+        This is path relative to this directory
+    
+    Abstract Methods:
+    cleanup() -> pd.DataFrame
+        Main method to clean and extract raw data, then build and return a dataframe
+    
+    Methods:
+    read_csv(filename: str) -> pd.DataFrame :
+        Read a csv file given the filename with respect to the raw_data folder that is in the same directory as this file
+        
+    read_xls(filename: str) -> pd.DataFrame :
+        Read a xls file given the filename with respect to the raw_data folder that is in the same directory as this file
+        
+    
+    """
     PATH_TO_FILES = './raw_data/'
             
     @abstractmethod
     def cleanup() -> pd.DataFrame: 
         pass
     
-    # @abstractmethod
-    # def __merge_dataframe(self) -> pd.DataFrame:
-    #     pass
-        
+    @abstractmethod
+    def merge_dataframe(self) -> pd.DataFrame:
+        pass        
     
     def read_csv(self, filename) -> pd.DataFrame:
         df = pd.read_csv(self.PATH_TO_FILES + filename)
@@ -39,17 +52,31 @@ class CleanerABC(ABC):
         
 class FAOStatCleaner(CleanerABC):
     
+    '''
+    Methods:
+    merge_dataframe(self) -> pd.DataFrame:
+        There are data from other files, we will merged the dataframed based on the Year column
+        
+    __extract_tlu(self) -> pd.DataFrame:
+        Extract Total Land Used in aggriculture data from the csv
+    
+    __extract_poc(self) -> pd.DataFrame:
+        Extract Production of Cereal data from the csv
+    
+    cleanup(self) -> pd.DataFrame:
+        Main method to clean and extract raw data, then build and return a dataframe
+    '''    
     def __init__(self):
         self.dict_filename = {
             'TLU': 'FAOSTAT_agricultural_area.csv',
             'POC': 'FAOSTAT_production.csv'
         }
         self.list_dataframe_to_merge = []
-    def __merge_dataframe(self) -> pd.DataFrame:
+        
+    def merge_dataframe(self) -> pd.DataFrame: 
         return pd.merge(self.list_dataframe_to_merge[0], self.list_dataframe_to_merge[1], on='Year')
     
-    #write brief description of what TLU means in the equation
-    def __extract_TLU(self) -> pd.DataFrame:
+    def __extract_tlu(self) -> pd.DataFrame:
         
         '''
         1. Removal of unused data
@@ -74,12 +101,12 @@ class FAOStatCleaner(CleanerABC):
         df_extract_TLU = df_csv.groupby('Year')['Value'].sum().reset_index(name='TLU')
         #transform
         #1. convert from 1unit to 1000 
-        print(df_extract_TLU.columns)
+
         df_extract_TLU['TLU'] /= 1000
         self.list_dataframe_to_merge.append(df_extract_TLU)
         return df_extract_TLU       
             
-    def __extract_POC(self) -> pd.DataFrame:
+    def __extract_poc(self) -> pd.DataFrame:
         
         '''
         
@@ -109,12 +136,26 @@ class FAOStatCleaner(CleanerABC):
         return df_extract_POC
 
     def cleanup(self):
-        df_extract_TLU = self.__extract_TLU()
-        df_extract_POC = self.__extract_POC()
+        df_extract_TLU = self.__extract_tlu()
+        df_extract_POC = self.__extract_poc()
         
-        return self.__merge_dataframe()
+        return self.merge_dataframe()
         
 class IMFStatCleaner(CleanerABC):
+    
+    '''
+    Methods:
+    merge_dataframe(self) -> pd.DataFrame:
+        There are data from other files, we will merged the dataframed based on the Year column
+        
+    __extract_debt(self) -> pd.DataFrame:
+        Extract Private Debt, loans and securities as a percent of GDP from the csv
+    
+    cleanup(self) -> pd.DataFrame:
+        Main method to clean and extract raw data, then build and return a dataframe    
+
+    Additional Info - Data arrangement for this xls file is peculiar. Take note
+    '''
     
     def __init__(self):
         self.dict_filename = {
@@ -123,7 +164,7 @@ class IMFStatCleaner(CleanerABC):
         self.list_dataframe_to_merge = []
         
         
-    def __extract_DEBT(self):
+    def __extract_debt(self):
         
         '''
         This xls file structure is weird.
@@ -142,7 +183,8 @@ class IMFStatCleaner(CleanerABC):
         # We need to transpose it because of weird file structure
         df_xls = df_xls.T
         
-        # We need to convert all the index into numbers or NaN so that we can filter. "Special case: "Private debt, loans and debt securities (Percent of GDP)"
+        # We need to convert all the index into numbers or NaN so that we can filter. 
+        # "Special case: "Private debt, loans and debt securities (Percent of GDP)"
         df_xls.index = pd.to_numeric(df_xls.index, errors='coerce')
         df_xls = df_xls.loc[(df_xls.index >= 1992) & (df_xls.index <= 2021) ]
         
@@ -161,14 +203,26 @@ class IMFStatCleaner(CleanerABC):
         
         return df_extract_DEBT
 
-    def __merge_dataframe(self):
+    def merge_dataframe(self):
         pass
     
     def cleanup(self):
-        return self.__extract_DEBT()
+        return self.__extract_debt()
         
     
 class UNStatCleaner(CleanerABC):
+    
+    '''
+    Methods:
+    merge_dataframe(self) -> pd.DataFrame:
+        There are data from other files, we will merged the dataframed based on the Year column
+        
+    __extract_pop(self) -> pd.DataFrame:
+        Extract Population of Iran from the csv
+    
+    cleanup(self) -> pd.DataFrame:
+        Main method to clean and extract raw data, then build and return a dataframe    
+    '''
     
     def __init__(self):
         
@@ -178,10 +232,10 @@ class UNStatCleaner(CleanerABC):
         
         self.list_dataframe_to_merge = []
         
-    def __merge_dataframe(self) -> pd.DataFrame:
+    def merge_dataframe(self) -> pd.DataFrame:
         pass
     
-    def __extract_POP(self):
+    def __extract_pop(self):
         
         filename = self.dict_filename['POP']
         df_csv = self.read_csv(filename)
@@ -201,10 +255,23 @@ class UNStatCleaner(CleanerABC):
         return df_extract_POP
 
     def cleanup(self):
-        return self.__extract_POP()
+        return self.__extract_pop()
 
 class WORLDBANKGROUPCleaner(CleanerABC):
+    '''
+    Methods:
+    merge_dataframe(self) -> pd.DataFrame:
+        There are data from other files, we will merged the dataframed based on the Year column
+        
+    __extract_rain(self) -> pd.DataFrame:
+        Extract rain data from the csv
+
+    __extract_temp(self) -> pd.DataFrame:
+        Extract temp data from the csv
     
+    cleanup(self) -> pd.DataFrame:
+        Main method to clean and extract raw data, then build and return a dataframe  
+    '''
     def __init__(self):
         
         self.dict_filename = {
@@ -214,10 +281,11 @@ class WORLDBANKGROUPCleaner(CleanerABC):
         
         self.list_dataframe_to_merge = []
         
-    def __merge_dataframe(self) -> pd.DataFrame:
+    def merge_dataframe(self) -> pd.DataFrame:
+        
         return pd.merge(self.list_dataframe_to_merge[0], self.list_dataframe_to_merge[1], on='Year')
     
-    def __extract_RAIN(self):
+    def __extract_rain(self):
         
         filename = self.dict_filename['RAIN']
         df_csv = self.read_csv(filename)
@@ -232,7 +300,7 @@ class WORLDBANKGROUPCleaner(CleanerABC):
         
         return df_extract_RAIN
         
-    def __extract_TEMP(self):
+    def __extract_temp(self):
         
         filename = self.dict_filename['TEMP']
         df_csv = self.read_csv(filename)
@@ -248,14 +316,24 @@ class WORLDBANKGROUPCleaner(CleanerABC):
         return df_extract_TEMP
     
     def cleanup(self):
-        self.list_dataframe_to_merge.append(self.__extract_RAIN())
-        self.list_dataframe_to_merge.append(self.__extract_TEMP())
+        self.list_dataframe_to_merge.append(self.__extract_rain())
+        self.list_dataframe_to_merge.append(self.__extract_temp())
         
-        return self.__merge_dataframe()
+        return self.merge_dataframe()
     
     
 class MACROTRENDCleaner(CleanerABC):
+    '''
+    Methods:
+    merge_dataframe(self) -> pd.DataFrame:
+        There are data from other files, we will merged the dataframed based on the Year column
+        
+    __extract_pop(self) -> pd.DataFrame:
+        Extract Population of Iran from the csv
     
+    cleanup(self) -> pd.DataFrame:
+        Main method to clean and extract raw data, then build and return a dataframe  
+    '''  
     def __init__(self):
         
         self.dict_filename = {
@@ -264,7 +342,7 @@ class MACROTRENDCleaner(CleanerABC):
     
         self.list_dataframe_to_merge = []
         
-    def __extract_ECO(self)-> pd.DataFrame:
+    def __extract_eco(self)-> pd.DataFrame:
         filename = self.dict_filename['ECO']
         df_xls = self.read_xls(filename)
         
@@ -277,15 +355,34 @@ class MACROTRENDCleaner(CleanerABC):
         
         return df_extract_ECO
             
-    def __merge_dataframe(self) -> pd.DataFrame:
+    def merge_dataframe(self) -> pd.DataFrame:
         pass
 
     def cleanup(self):
-        return self.__extract_ECO()
+        return self.__extract_eco()
         
     
-class CleanerConcrete():
+class CleanEverything(CleanerABC):
+    '''
+    Context: Main Cleaner that will run all the cleaning functions, build an aggregated dataframe and then write into the CSV file
     
+    Attributes
+        self.FAOStatCleaner:FAOStatCleaner
+        self.IMFStatCleaner:IMFStatCleaner
+        self.UNStatCleaner:UNStatCleaner
+        self.WORLDBANKGROUPCleaner:WORLDBANKGROUPCleaner
+        self.MACROTRENDCleaner:MACROTRENDCleaner
+        self.list_dataframe_to_merge:List[pd.DataFrame]
+    
+    methods:
+        merge_dataframe()-> pd.DataFrame:
+            Merge all the dataframes based on the column 'Year' but we will drop this column after merging since it's not needed in the machine learning model
+        cleanup()-> pd.DataFrame
+            Clean up all the raw data and then recover all the built dataframes, and then we merge
+        run():
+            Run clean up, recover dataframe and then write into csv file
+    
+    '''
     def __init__(self):
         self.FAOStatCleaner = FAOStatCleaner()
         self.IMFStatCleaner = IMFStatCleaner()
@@ -295,7 +392,7 @@ class CleanerConcrete():
         self.list_dataframe_to_merge = []
         
         
-    def __merge_dataframe(self) -> pd.DataFrame:
+    def merge_dataframe(self) -> pd.DataFrame:
         
         df_merged = pd.merge(self.list_dataframe_to_merge[0], self.list_dataframe_to_merge[1], on='Year')
         
@@ -311,13 +408,13 @@ class CleanerConcrete():
         return df_merged_reordered
            
     
-    def cleanup(self):
+    def cleanup(self) -> pd.DataFrame:
         self.list_dataframe_to_merge.append(self.FAOStatCleaner.cleanup())
         self.list_dataframe_to_merge.append(self.IMFStatCleaner.cleanup())
         self.list_dataframe_to_merge.append(self.UNStatCleaner.cleanup())
         self.list_dataframe_to_merge.append(self.WORLDBANKGROUPCleaner.cleanup())
         self.list_dataframe_to_merge.append(self.MACROTRENDCleaner.cleanup())
-        return self.__merge_dataframe()
+        return self.merge_dataframe()
     
     def run(self):
         df_merged = self.cleanup()
@@ -325,5 +422,5 @@ class CleanerConcrete():
 
 
 if __name__ == '__main__':
-    CleanerConcrete().run()
+    CleanEverything().run()
     

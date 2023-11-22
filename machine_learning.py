@@ -99,15 +99,16 @@ class RegressionEvaluation():
 
     def __init__(self):
         self.list_r2_score = []
+        self.list_mean_square_error = []
+        
     def r2_score(self, y, ypred):
+        
         if ~isinstance(ypred, pd.DataFrame):
             ypred = pd.DataFrame(ypred)
         
         ypred.rename(columns={0:'POC'}, inplace=True)
                
-        # print('ypred shape ', ypred.shape)
-        # print('y shape : ', y.shape)
-        
+
         y['POC'].astype(float)
         ypred['POC'].astype(float)
         
@@ -119,30 +120,34 @@ class RegressionEvaluation():
         #total sum square
         sstot = np.matmul(y_minus_mean.T, y_minus_mean)        
         ssres_divide_sstot = ssres/sstot
-        
+
         r_square_value = 1 - ssres_divide_sstot.loc['POC','POC']
         self.list_r2_score.append(r_square_value)
 
         return r_square_value
     
-    # def r2_score(self, y: np.ndarray, ypred: np.ndarray) -> np.ndarray:
-    #     """Computes the R2 coefficient of determination.
+    def mean_squared_error(self, y, ypred):
         
-    #     For K given actual/predicted target values
-    #     """ 
-
-    #     y = y.to_numpy()
-    #     y_mean = np.mean(y)
-    #     print('y mean : ',y_mean)
-    #     print('ypred: ', ypred)
-    #     r2_value = 1 - np.sum((y - ypred) * (y - ypred)) / np.sum((y - y_mean) * (y - y_mean))
-    #     print('r2_value ', r2_value)
-    #     return 1 - np.sum((y - ypred) * (y - ypred)) / np.sum((y - y_mean) * (y - y_mean))
     
-    def mean_squared_error(self, target, pred):
-        m = target.shape[0]
-        err = target - pred
-        return np.matmul(err.T, err)[0][0] / m
+        # edit
+        if ~isinstance(ypred, pd.DataFrame):
+            ypred = pd.DataFrame(ypred)
+        
+        ypred.rename(columns={0:'POC'}, inplace=True)
+               
+        
+        
+        y['POC'].astype(float)
+        ypred['POC'].astype(float)
+        #
+        m = y.shape[0]
+
+        err = y - ypred
+        mse_value = np.matmul(err.T, err).loc['POC','POC'] #divide by m
+        mse_value /= m
+        
+        self.list_mean_square_error.append(mse_value)
+        return mse_value
     
     def compute_cost_linreg(self, X, y, beta):
         J = 0
@@ -173,7 +178,50 @@ class RegressionModel(RegressionUtils, RegressionEvaluation):
         self.df_kfold = pd.DataFrame(df_kfold_columns)
         
     def write_beta_list_to_csv(self, array_beta):
-        pass
+        print('list r2 score : ', self.list_r2_score)
+        print('list mean square error : ',self.list_mean_square_error)
+        
+        '''
+        clean up multi-dimensional array
+        array_beta = list[list[list[int]]]        
+        '''
+        new_array_beta = []
+        for i in array_beta:
+            flatten_list = []
+            for j in i:
+                flatten_list.append(j[0])
+            new_array_beta.append(flatten_list)
+            
+        #["TEMP", "TLU", "RAIN", "POP", "DEBT", "ECO"]
+        dict_to_dataframe = {
+            'CONSTANT' : [],
+            'TEMP' : [],
+            'TLU' : [],
+            'RAIN': [],
+            'POP': [],
+            'DEBT': [],
+            'ECO': [],
+            'R2_SCORE': [],
+            'MSE_SCORE': []
+        }
+        
+        for index,each_beta_list in enumerate(new_array_beta):
+            dict_to_dataframe['CONSTANT'].append(each_beta_list[0])
+            dict_to_dataframe['TEMP'].append(each_beta_list[1])
+            dict_to_dataframe['TLU'].append(each_beta_list[2])
+            dict_to_dataframe['RAIN'].append(each_beta_list[3])
+            dict_to_dataframe['POP'].append(each_beta_list[4])
+            dict_to_dataframe['DEBT'].append(each_beta_list[5])
+            dict_to_dataframe['ECO'].append(each_beta_list[6])
+            dict_to_dataframe['R2_SCORE'].append(self.list_r2_score[index])
+            dict_to_dataframe['MSE_SCORE'].append(self.list_mean_square_error[index])
+        
+        df_k_fold = pd.DataFrame(dict_to_dataframe)        
+        # print(df_k_fold)
+        df_k_fold.to_csv('k_fold.csv', index=False) #        df_merged.to_csv('2D_DATA.csv', index=False)
+        print('Complete')
+            
+        
 
     def linreg(self, df, feature_col, target_col, iterations=1500, alpha=0.01, random_state=100, test_size=0.3, sample=1):
         df_features, df_target = (df.loc[:, feature_col].copy(), df.loc[:, target_col].copy())
@@ -238,7 +286,10 @@ class RegressionModel(RegressionUtils, RegressionEvaluation):
 
             # call the predict() method
             pred = self.predict_linreg(df_features_test, beta)
+            
+            # Using metrics for model evaluation
             self.r2_score(df_target_test, pred)
+            self.mean_squared_error(df_target_test, pred)
             # Let's store the values inside a dataframe so that we can output into a csv
             
 
@@ -249,11 +300,18 @@ class RegressionModel(RegressionUtils, RegressionEvaluation):
             df = pd.read_csv("2D_DATA.csv")
             feature_col = ["TEMP", "TLU", "RAIN", "POP", "DEBT", "ECO"]
             target_col = ["POC"]
-            beta_l = self.k_cross_validation(df, feature_col, target_col, k=10, iterations=1500, alpha=0.01)    
-            print(self.list_r2_score)
-            self.write_beta_list_to_csv(beta_l)
-            
+            beta_l = self.k_cross_validation(df, feature_col, target_col, k=10, iterations=1500, alpha=0.01)
+            return beta_l
+        
+    def build_csv_with_kfold(self):
+        
+        beta_l = self.run_k_cross_validation()             
+        self.write_beta_list_to_csv(beta_l)
             
             
 if __name__ == '__main__':
-    RegressionModel().run_k_cross_validation()
+    '''
+    We will use this module for out bonus page.
+    Only run this function once for training the model. Do not run this if it's used as a module .
+    '''
+    RegressionModel().build_csv_with_kfold()
