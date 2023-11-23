@@ -371,7 +371,10 @@ class RegressionModel(RegressionUtils, RegressionEvaluation):
         for name in feature_col:
             plt.scatter(test[name], target)
             plt.scatter(test[name], pred)
+            plt.xlabel(name)
+            plt.ylabel('POC')
             plt.show()
+                
                 
             
 if __name__ == '__main__':
