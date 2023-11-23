@@ -3,212 +3,373 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-def normalize_z(df, columns_means=None, columns_stds=None):
-    if columns_means is None:
-        columns_means = df.mean(axis=0)
 
-    if columns_stds is None:
-        columns_stds = df.std(axis=0)
+'''
+Class RegressionUtils
+    Provides utility functions
+Class RegressionEvaluation
+    Provides Calculations functions for evaluation metrics and optimzation
     
-    dfout = (df - np.array(columns_means)) / np.array(columns_stds)
+Class RegressionMode(RegressionUtils, RegressionEvaluation)
+    Provides Training functions and building the CSV file 
+'''
+class RegressionUtils():
     
-    return dfout, columns_means, columns_stds
-
-def normalize_minmax(dfin, columns_mins=None, columns_maxs=None):
-#def normalize_z(df, columns_means=None, columns_stds=None):
-
-    if columns_mins is None:
-        columns_mins = dfin.min(axis=0)
-
-    if columns_maxs is None:
-        columns_maxs = dfin.max(axis=0)
-    
-    if isinstance(columns_maxs, list) and isinstance(columns_mins, list):
-        columns_gap = []
-        for idx in range(len(columns_maxs)):
-            columns_gap.append(columns_maxs[idx] - columns_mins[idx])
+    '''
+    Methods:
+        normalize_z(df :pd.DataFrame, columns_means: float, columns_stds: float): /
+                    -> dfout:pd.Dataframe, columns_means:float, columns_stds: float        
+            Normalizes a DataFrame using Z-score normalization. It can use precomputed means and standard deviations if provided.
+        
+        prepare_feature(df_feature: pd.DataFrame): -> pd.DataFrame
+            Prepares the feature matrix for regression by adding a constant column. It handles DataFrame, Series, and NumPy array inputs.
             
-        dfout = (dfin - np.array(columns_mins)) / np.array(columns_gap)
-    else:
-        dfout = (dfin - np.array(columns_mins)) / (np.array(columns_maxs) - np.array(columns_mins))
-    
-    return dfout, columns_mins, columns_maxs
-
-def get_features_targets(df, feature_names, target_names):
-    df_feature = df.loc[:, feature_names].copy()
-    df_target = df.loc[:, target_names].copy()
-    return df_feature, df_target
-
-def prepare_feature(df_feature):
-    if isinstance(df_feature, pd.DataFrame):
-        np_feature = df_feature.to_numpy()
-        cols = df_feature.shape[1]
-    elif isinstance(df_feature, pd.Series):
-        np_feature = df_feature.to_numpy()
-        cols = 1
-    else:
-        np_feature = df_feature
-        cols = df_feature.shape[1]
-    feature = np_feature.reshape(-1, cols)
-    X = np.concatenate((np.ones((feature.shape[0], 1)), feature), axis=1)
-    return X
-
-def prepare_target(df_target):
-    if isinstance(df_target, pd.DataFrame):
-        np_target = df_target.to_numpy()
-    elif isinstance(df_target, pd.Series):
-        np_target = df_target.to_numpy()
-    else:
-        np_target = df_target
-    np_target = np_target.reshape(-1, 1)
-    return np_target
-
-def predict_linreg(df_feature, beta, means=None, stds=None):
-    df_feature_z = normalize_z(df_feature, means, stds)[0]
-    X = prepare_feature(df_feature_z)
-    pred = calc_linreg(X, beta)
-    
-    return pred
-
-def calc_linreg(X, beta):
-    return np.matmul(X, beta)
-
-def split_data(df_feature, df_target, random_state=None, test_size=0.5):
-    
-    idx_lst = df_feature.index
-    #target_idx = df_target.index
-    
-    if random_state is not None:
-        np.random.seed(random_state)
-        #print(random_state)
-    
-    test_idx = np.random.choice(idx_lst, size=int(test_size * len(idx_lst)), replace=False)
-    #target_test_idx = np.random.choice(target_idx, size=int(test_size * len(target_idx)), replace=False)
-    
-    train_idx = []
-    
-    for idx in idx_lst:
-        if idx not in test_idx:
-            train_idx.append(idx)
-    
-    df_feature_test = df_feature.loc[test_idx, :].copy()
-    df_target_test = df_target.loc[test_idx, :].copy()
-    df_feature_train = df_feature.loc[train_idx, :].copy()
-    df_target_train = df_target.loc[train_idx, :].copy()    
-    
-    return df_feature_train, df_feature_test, df_target_train, df_target_test
-  
-def r2_score(y, ypred):
-    ssres = np.matmul((y - ypred).T, (y - ypred))
-    sstot = np.matmul((y - np.mean(y)).T, (y - np.mean(y)))
-    return 1 - (ssres / sstot)[0][0]
-
-def mean_squared_error(target, pred):
-    m = target.shape[0]
-    err = target - pred
-    return np.matmul(err.T, err)[0][0] / m
-
-def compute_cost_linreg(X, y, beta):
-    J = 0
-    m = len(y)
-    y_cap = np.matmul(X, beta) #calc_linreg(X, beta)
-    J = (1 / (2 * m)) * np.matmul((y_cap - y).T, (y_cap - y))
-    return J[0][0]
-
-def gradient_descent_linreg(X, y, beta, alpha, num_iters):
-    m = len(y)
-    J_storage = []
-    for _ in range(num_iters):
-        pred = calc_linreg(X, beta)
-        error = pred - y
-        beta = beta - alpha / m * np.matmul(X.T, error)
-        J_storage.append(compute_cost_linreg(X, y, beta))
-    return beta, J_storage
-
-def linreg(df, feature_col, target_col, iterations=1500, alpha=0.01, random_state=100, test_size=0.3, sample=1, m=0):
-    df_features, df_target = (df.loc[:, feature_col].copy(), df.loc[:, target_col].copy())
-
-    df_features_train, df_features_test, df_target_train, df_target_test = split_data(df_features, df_target, random_state=random_state, test_size=test_size)
-    df_features_train_z,_,_ = normalize_z(df_features_train, np.mean(df_features, axis=0), np.std(df_features, axis=0, ddof=sample))
-
-    X = prepare_feature(df_features_train_z)
-    target = prepare_target(df_target_train)
-
-    beta = np.zeros((m+1,1))
-
-    beta, J_storage = gradient_descent_linreg(X, target, beta, alpha, iterations)
-
-    pred = predict_linreg(df_features_test, beta)
-    target = prepare_target(df_target_test)
-    r2 = r2_score(target, pred)
-
-    return beta, r2
-
-def split_data_k_cross(df, random_state=None, k=10):
-    
-    if random_state is not None:
-        np.random.seed(random_state)
+        prepare_target(df_target: pd.DataFrame): -> pd.DataFrame
+            Converts target data into a suitable format for regression. Works with DataFrame, Series, and NumPy array inputs.
+            
+        get_features_targets(df:pd.DataFrame, feature_names:list[Str], target_names:list[Str]): 
+            Extracts features and targets from a DataFrame based on specified column names.
+            
+        predict_linreg(df_feature: pd.DataFrame, beta: list[float], means: float, stds: float): 
+            Makes predictions using a linear regression model given features, model coefficients, and optional normalization parameters.
+            
+        calc_linreg(X: pd.DataFrame, beta:pd.DataFrame): 
+            Calculates the output of a linear regression equation given a feature matrix and model coefficients.
         
-    df_copy = df.copy().to_numpy()
-    np.random.shuffle(df_copy)
+        split_data(df_feature: pd.DataFrame, df_target: pd.DataFrame, random_state: float, test_size:): 
+            Splits feature and target data into training and testing sets based on a specified test size and random state.
+    """
+    '''
     
-    folds = np.array_split(df_copy, k)
-    
-    return folds
+    def normalize_z(self, df, columns_means=None, columns_stds=None):
+        if columns_means is None:
+            columns_means = df.mean(axis=0)
 
-def k_cross_validation(df, feature_col, target_col, k=10, iterations=1500, alpha=0.01, m=3, rs=100):
-    folds = split_data_k_cross(df, random_state=rs, k=k)
-    beta_lst = []
-    r2lst = []
-    ddfold = {}
-    for i in range(k):
-        ddfold[i] = pd.DataFrame(folds[i], columns=(target_col + feature_col))
-
-    nlst = list(range(k))
-
-    for i in range(k):
-        tlst = []
-        for idx in nlst:
-            if idx != i:
-                tlst.append(ddfold[idx])
-        test = ddfold[i]
-        train = pd.concat(tlst)
-        #display(test)
-        #print(train.shape)
-        df_features = df.loc[:, feature_col]
-        df_features_train = train.loc[:, feature_col].copy()
-        df_target_train = train.loc[:, target_col].copy()
-        df_features_test = test.loc[:, feature_col].copy()
-        df_target_test = test.loc[:, target_col].copy()
-
-        df_features_train_z,_,_ = normalize_z(df_features_train, np.mean(df_features, axis=0), np.std(df_features, axis=0, ddof=1))
-
-        X = prepare_feature(df_features_train_z)
-        target = prepare_target(df_target_train)
-
-        beta = np.zeros((m+1,1))
-
-        # Call the gradient_descent function
-        beta, J_storage = gradient_descent_linreg(X, target, beta, alpha, iterations)
-
-        # call the predict() method
-        pred = predict_linreg(df_features_test, beta)
-        target = prepare_target(df_target_test)
-        r2 = r2_score(target, pred)
-
-        beta_lst.append(beta)
-        r2lst.append(r2)
+        if columns_stds is None:
+            columns_stds = df.std(axis=0)
         
-    return beta_lst, r2lst
+        dfout = (df - np.array(columns_means)) / np.array(columns_stds)
+        
+        return dfout, columns_means, columns_stds   
+    
+    def prepare_feature(self, df_feature):
+        if isinstance(df_feature, pd.DataFrame):
+            np_feature = df_feature.to_numpy()
+            cols = df_feature.shape[1]
+        elif isinstance(df_feature, pd.Series):
+            np_feature = df_feature.to_numpy()
+            cols = 1
+        else:
+            np_feature = df_feature
+            cols = df_feature.shape[1]
+        feature = np_feature.reshape(-1, cols)
+        X = np.concatenate((np.ones((feature.shape[0], 1)), feature), axis=1)
+        return X
+    
+    def prepare_target(self, df_target):
+        if isinstance(df_target, pd.DataFrame):
+            np_target = df_target.to_numpy()
+        elif isinstance(df_target, pd.Series):
+            np_target = df_target.to_numpy()
+        else:
+            np_target = df_target
+        np_target = np_target.reshape(-1, 1)
+        return np_target
+    
+    def get_features_targets(self, df, feature_names, target_names):
+        df_feature = df.loc[:, feature_names].copy()
+        df_target = df.loc[:, target_names].copy()
+        return df_feature, df_target
+    
+    def predict_linreg(self, df_feature, beta, means=None, stds=None):
+        df_feature_z = self.normalize_z(df_feature, means, stds)[0]
+        X = self.prepare_feature(df_feature_z)
+        pred = self.calc_linreg(X, beta)    
+        return pred
+    
+    def calc_linreg(self, X, beta):
+        return np.matmul(X, beta)
+    
+    def split_data(self, df_feature, df_target, random_state=None, test_size=0.5):
+        
+        idx_lst = df_feature.index
+        #target_idx = df_target.index
+        
+        if random_state is not None:
+            np.random.seed(random_state)
+            #print(random_state)
+        
+        test_idx = np.random.choice(idx_lst, size=int(test_size * len(idx_lst)), replace=False)
+        #target_test_idx = np.random.choice(target_idx, size=int(test_size * len(target_idx)), replace=False)
+        
+        train_idx = []
+        
+        for idx in idx_lst:
+            if idx not in test_idx:
+                train_idx.append(idx)
+        
+        df_feature_test = df_feature.loc[test_idx, :].copy()
+        df_target_test = df_target.loc[test_idx, :].copy()
+        df_feature_train = df_feature.loc[train_idx, :].copy()
+        df_target_train = df_target.loc[train_idx, :].copy()    
+        
+        return df_feature_train, df_feature_test, df_target_train, df_target_test
 
-df = pd.read_csv("2D_DATA_variation_2.csv")
-feature_col = ["POP", "TEMP", "FDI"]
-target_col = ["POC"]
-beta_l, r2lst = k_cross_validation(df, feature_col, target_col, k=5, iterations=1500, alpha=0.01, rs=7, m=3)
+class RegressionEvaluation():
+    '''
+    Attributes:
+        list_r2_score : List[float] 
+            This is used for writing into the CSV file for k-fold training, will be used for evaluation report
+        list_mean_square_error : List[float]
+            This is used for writing into the CSV file for k-fold training, will be used for evaluation report
+    
+    Methods:    
+        r2_score(y:pd.DataFrame, ypred: pd.DataFrame) -> float
+            Generate te r2_sccore using the feature and target
+            
+        mean_squared_error(y:pd.DataFrame, ypred: pd.DataFrame) -> float
+            Generate mean square error value
+            
+        compute_cost_linreg(X:pd.DataFrame, ypred: pd.DataFrame, beta: pd.DataFrame) -> float   
+            Compute the cost of the linear regression
+             
+        gradient_descent_linreg(X:pd.DataFrame, y: pd.DataFrame, beta:pd.DataFrame, alpha:float, num_iters:float) -> Tuple(beta: pd.DataFarme, J_storage: list[float])
+            Gradient descent linear regression algorithm
+    '''
+    def __init__(self):
+        self.list_r2_score = []
+        self.list_mean_square_error = []
+        
+    def r2_score(self, y, ypred):
+        
+        if ~isinstance(ypred, pd.DataFrame):
+            ypred = pd.DataFrame(ypred)
+        
+        ypred.rename(columns={0:'POC'}, inplace=True)
+               
 
-print(r2lst)
-print("===============================")
+        y['POC'].astype(float)
+        ypred['POC'].astype(float)
+        
+        #residual sum of squares
+        y_minus_ypred = y - ypred
+        ssres = np.matmul(y_minus_ypred.T, y_minus_ypred)
+        
+        y_minus_mean = y - np.mean(y)
+        #total sum square
+        sstot = np.matmul(y_minus_mean.T, y_minus_mean)        
+        ssres_divide_sstot = ssres/sstot
 
-beta, r2 = linreg(df, feature_col, target_col, random_state=100, test_size=0.3, sample=1, m=3)
-print(r2)
-print(beta)
+        r_square_value = 1 - ssres_divide_sstot.loc['POC','POC']
+        self.list_r2_score.append(r_square_value)
+
+        return r_square_value
+    
+    def mean_squared_error(self, y, ypred):
+    
+        # edit
+        if ~isinstance(ypred, pd.DataFrame):
+            ypred = pd.DataFrame(ypred)
+        
+        ypred.rename(columns={0:'POC'}, inplace=True)
+               
+        
+        
+        y['POC'].astype(float)
+        ypred['POC'].astype(float)
+        #
+        m = y.shape[0]
+
+        err = y - ypred
+        mse_value = np.matmul(err.T, err).loc['POC','POC'] #divide by m
+        mse_value /= m
+        
+        self.list_mean_square_error.append(mse_value)
+        return mse_value
+    
+    def compute_cost_linreg(self, X, y, beta):
+        J = 0
+        m = len(y)
+        y_cap = np.matmul(X, beta) #calc_linreg(X, beta)
+        J = (1 / (2 * m)) * np.matmul((y_cap - y).T, (y_cap - y))
+        return J[0][0]
+    
+    def gradient_descent_linreg(self, X, y, beta, alpha, num_iters):
+        m = len(y)
+        J_storage = []
+        for _ in range(num_iters):
+            pred = self.calc_linreg(X, beta)
+            error = pred - y
+            beta = beta - alpha / m * np.matmul(X.T, error)
+            J_storage.append(self.compute_cost_linreg(X, y, beta))
+        return beta, J_storage
+
+class RegressionModel(RegressionUtils, RegressionEvaluation):
+    '''
+        Context: 
+            Provides Training functions and building the CSV file 
+        
+        Attributes: 
+            df_kfold: pd.DataFrame
+                Stores the data collected from the k-fold algorithm
+        
+        Methods:
+            write_beta_list_to_csv(array_beta: List[float]) ->
+                Clean up the beta values before building a dataframe, generate CSV for models by the k-fold algo
+            
+            linreg(df :pd.DataFrame, feature_col: list[Str], target_col: list[Str], k:int, iterations:int, alpha:float) -> float
+                Linear regression using data that will be split into training and test
+            
+            split_data_k_cross(df:pd.DataFrame, random_state:float, k:int) -> np.array
+                Split the DataFrame into k folds for cross-validation, returns A list of DataFrames, each representing a fold.
+            
+            k_cross_validation(df:pd.DataFrame, feature_col: list[Str], target_col: list[Str], k: int, iterations:int, alpha: float) -> List[List[List[int]]]
+                Perform k-fold cross-validation on the given DataFram and return list of model coefficients (beta values) for each fold
+            
+            run_k_cross_validation
+                Run k-fold cross-validation on the dataset specified in the "2D_DATA.csv" file.
+            
+            build_csv_with_kfold
+                Build a CSV file with the results from k-fold cross-validation.
+                This method runs k-fold cross-validation and writes the results, including beta coefficients,
+                R-squared values, and mean squared error, to a CSV file named 'k_fold.csv'
+            
+    '''
+    def __init__(self):
+        super().__init__()        
+        df_kfold_columns = ["CONSTANT","TEMP", "TLU", "RAIN", "POP", "DEBT", "ECO","MSE","RSQUARE"]
+        self.df_kfold = pd.DataFrame(df_kfold_columns)
+        
+    def write_beta_list_to_csv(self, array_beta):
+        
+        '''
+        clean up multi-dimensional array
+        array_beta = list[list[list[int]]]        
+        '''
+        new_array_beta = []
+        for i in array_beta:
+            flatten_list = []
+            for j in i:
+                flatten_list.append(j[0])
+            new_array_beta.append(flatten_list)
+            
+        #["TEMP", "TLU", "RAIN", "POP", "DEBT", "ECO"]
+        dict_to_dataframe = {
+            'CONSTANT' : [],
+            'TEMP' : [],
+            'TLU' : [],
+            'RAIN': [],
+            'POP': [],
+            'DEBT': [],
+            'ECO': [],
+            'R2_SCORE': [],
+            'MSE_SCORE': []
+        }
+        
+        for index,each_beta_list in enumerate(new_array_beta):
+            dict_to_dataframe['CONSTANT'].append(each_beta_list[0])
+            dict_to_dataframe['TEMP'].append(each_beta_list[1])
+            dict_to_dataframe['TLU'].append(each_beta_list[2])
+            dict_to_dataframe['RAIN'].append(each_beta_list[3])
+            dict_to_dataframe['POP'].append(each_beta_list[4])
+            dict_to_dataframe['DEBT'].append(each_beta_list[5])
+            dict_to_dataframe['ECO'].append(each_beta_list[6])
+            dict_to_dataframe['R2_SCORE'].append(self.list_r2_score[index])
+            dict_to_dataframe['MSE_SCORE'].append(self.list_mean_square_error[index])
+
+        df_k_fold = pd.DataFrame(dict_to_dataframe)        
+        print(df_k_fold)
+        df_k_fold.to_csv('k_fold.csv', index=False) 
+            
+    def linreg(self, df, feature_col, target_col, m, iterations=1500, alpha=0.01, random_state=100, test_size=0.2, sample=1):
+        df_features, df_target = (df.loc[:, feature_col].copy(), df.loc[:, target_col].copy())
+
+        df_features_train, df_features_test, df_target_train, df_target_test = self.split_data(df_features, df_target, random_state=random_state, test_size=test_size)
+        df_features_train_z,_,_ = self.normalize_z(df_features_train, np.mean(df_features, axis=0), np.std(df_features, axis=0, ddof=sample))
+
+        X = self.prepare_feature(df_features_train_z)
+        target = self.prepare_target(df_target_train)
+
+        beta = np.zeros((m,1))
+
+        beta, J_storage = self.gradient_descent_linreg(X, target, beta, alpha, iterations)
+        return beta
+
+    def split_data_k_cross(self,df, random_state=None, k=10):
+        
+        if random_state is not None:
+            np.random.seed(random_state)
+            
+        df_copy = df.copy().to_numpy()
+        np.random.shuffle(df_copy)
+        
+        folds = np.array_split(df_copy, k)
+        
+        return folds
+
+    def k_cross_validation(self,df, feature_col, target_col,m, k=10, iterations=1500, alpha=0.01):
+        folds = self.split_data_k_cross(df)
+        beta_lst = []
+        ddfold = {}
+        for i in range(k):
+            ddfold[i] = pd.DataFrame(folds[i], columns=(target_col + feature_col))
+
+        nlst = list(range(k))
+
+        for i in range(k):
+            tlst = []
+            for idx in nlst:
+                if idx != i:
+                    tlst.append(ddfold[idx])
+            test = ddfold[i]
+            train = pd.concat(tlst)
+            #display(test)
+            #print(train.shape)
+            df_features = df.loc[:, feature_col]
+            df_features_train = train.loc[:, feature_col].copy()
+            df_target_train = train.loc[:, target_col].copy()
+            df_features_test = test.loc[:, feature_col].copy()
+            df_target_test = test.loc[:, target_col].copy()
+
+            df_features_train_z,_,_ = self.normalize_z(df_features_train, np.mean(df_features, axis=0), np.std(df_features, axis=0, ddof=1))
+
+            X = self.prepare_feature(df_features_train_z)
+            target = self.prepare_target(df_target_train)
+
+            beta = np.zeros((m,1))
+
+            # Call the gradient_descent function
+            beta, J_storage = self.gradient_descent_linreg(X, target, beta, alpha, iterations)
+
+            # call the predict() method
+            pred = self.predict_linreg(df_features_test, beta)
+            
+            # Using metrics for model evaluation
+            self.r2_score(df_target_test, pred)
+            self.mean_squared_error(df_target_test, pred)
+            # Let's store the values inside a dataframe so that we can output into a csv
+            
+
+            beta_lst.append(beta)
+        return beta_lst
+
+    def run_k_cross_validation(self):
+        
+        df = pd.read_csv("variation_2_2D_DATA.csv")
+        feature_col = ["POP", "TEMP", "FDI"]
+        target_col = ["POC"]
+        beta_l = self.k_cross_validation(df, feature_col, target_col,m=3, k=10, iterations=1500, alpha=0.01)
+        return beta_l
+        
+    def build_csv_with_kfold(self):
+        
+        beta_l = self.run_k_cross_validation()             
+        self.write_beta_list_to_csv(beta_l)
+            
+            
+if __name__ == '__main__':
+    '''
+    We will use this module for out bonus page.
+    Only run this function once for training the model. Do not run this if it's used as a module .
+    '''
+    RegressionModel().build_csv_with_kfold()

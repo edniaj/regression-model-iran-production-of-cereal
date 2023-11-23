@@ -3,23 +3,9 @@ import pandas as pd
 from abc import ABC, abstractmethod
 import math
 '''
-UPDATE ON VARIATION 2 
-When we were doing k-fold cross validation, there was extreme fluctuations of R2_score
-    - We have pin-point the issue as the lack of dataset, the bottleneck of the dataset was Debt and Economic growth. 
-    / they were only dated 1992-2021 while other datasets are dated from 1970-2021
+UPDATE ON VARIATION 3 
 
-We will introduce a new variable called FDI (Foreign directed investment against GDP (%)) from WORLD BANK GROUP.
-    - There is gap in this dataset 1991,1992. This might be because of the gulf war.
-    
-Independent variables used in Variation 2
-Production of Cereal (POC), Population (POP), Temperature (TEMP), Foreign Directed Investment (FDI)
-
-    Independent Variable introduced in Variation 2
-    - Foreign Directed Investment (FDI)
-    Independent Variable removed in Variation 2
-    - Total land used in Agriculture (TLU), Economic growth Delta (ECO), Private Debts and securities (DEBT)
-
-This file serves the purpose of extracting raw files from the raw_data folder, aggregate the data and build a CSV file for the purpose of machine learning
+We will remove outliers data which is any data of 1973, 2002, 2003, 2004
 '''
 
 class CleanerABC(ABC):
@@ -57,7 +43,8 @@ class CleanerABC(ABC):
     PATH_TO_FILES = './raw_data/'
     YEAR_FROM = 1970
     YEAR_END = 2021
-    YEAR_TO_REMOVE=[1991, 1992]
+    YEARS_TO_REMOVE_OUTLIERS = [1973, 2002, 2003, 2004]
+    YEAR_TO_REMOVE=[1991, 1992] + YEARS_TO_REMOVE_OUTLIERS
     
     @abstractmethod
     def cleanup() -> pd.DataFrame: 
@@ -201,12 +188,13 @@ class UNStatCleaner(CleanerABC):
         #transform
         # 1. Change population unites from 1 thousand to 1 million
         df_extract_POP['POP'] /=1000
-        
+
+        print(df_extract_POP)
         
         # 2.  Ln it
         for index, row in df_extract_POP.iterrows():
             df_extract_POP.at[index, 'POP'] = math.log(row['POP'], math.e)
-        
+        print(df_extract_POP)
         return df_extract_POP
 
     def cleanup(self):
@@ -359,7 +347,7 @@ class CleanEverything(CleanerABC):
     
     def run(self):
         df_merged = self.cleanup()
-        df_merged.to_csv('variation_2_2D_DATA.csv', index=False)
+        df_merged.to_csv('variation_3_2D_DATA.csv', index=False)
 
 
 if __name__ == '__main__':

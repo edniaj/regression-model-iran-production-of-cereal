@@ -203,8 +203,6 @@ class RegressionEvaluation():
             J_storage.append(self.compute_cost_linreg(X, y, beta))
         return beta, J_storage
 
-    
-
 class RegressionModel(RegressionUtils, RegressionEvaluation):
     '''
         Context: 
