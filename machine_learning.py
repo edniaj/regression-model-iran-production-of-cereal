@@ -165,7 +165,6 @@ class RegressionEvaluation():
         return r_square_value
     
     def mean_squared_error(self, y, ypred):
-        
     
         # edit
         if ~isinstance(ypred, pd.DataFrame):
@@ -234,11 +233,7 @@ class RegressionModel(RegressionUtils, RegressionEvaluation):
             build_csv_with_kfold
                 Build a CSV file with the results from k-fold cross-validation.
                 This method runs k-fold cross-validation and writes the results, including beta coefficients,
-                R-squared values, and mean squared error, to a CSV file named 'k_fold.csv'.
-
-                
-
-
+                R-squared values, and mean squared error, to a CSV file named 'k_fold.csv'
             
     '''
     def __init__(self):
@@ -282,11 +277,12 @@ class RegressionModel(RegressionUtils, RegressionEvaluation):
             dict_to_dataframe['ECO'].append(each_beta_list[6])
             dict_to_dataframe['R2_SCORE'].append(self.list_r2_score[index])
             dict_to_dataframe['MSE_SCORE'].append(self.list_mean_square_error[index])
-        
+
         df_k_fold = pd.DataFrame(dict_to_dataframe)        
+        print(df_k_fold)
         df_k_fold.to_csv('k_fold.csv', index=False) 
             
-    def linreg(self, df, feature_col, target_col, iterations=1500, alpha=0.01, random_state=100, test_size=0.3, sample=1):
+    def linreg(self, df, feature_col, target_col, iterations=1500, alpha=0.01, random_state=100, test_size=0.2, sample=1):
         df_features, df_target = (df.loc[:, feature_col].copy(), df.loc[:, target_col].copy())
 
         df_features_train, df_features_test, df_target_train, df_target_test = self.split_data(df_features, df_target, random_state=random_state, test_size=test_size)

@@ -125,7 +125,7 @@ def gradient_descent_linreg(X, y, beta, alpha, num_iters):
         J_storage.append(compute_cost_linreg(X, y, beta))
     return beta, J_storage
 
-def linreg(df, feature_col, target_col, iterations=1500, alpha=0.01, random_state=100, test_size=0.3, sample=1):
+def linreg(df, feature_col, target_col, iterations=1500, alpha=0.01, random_state=100, test_size=0.3, sample=1, m=0):
     df_features, df_target = (df.loc[:, feature_col].copy(), df.loc[:, target_col].copy())
 
     df_features_train, df_features_test, df_target_train, df_target_test = split_data(df_features, df_target, random_state=random_state, test_size=test_size)
@@ -134,10 +134,15 @@ def linreg(df, feature_col, target_col, iterations=1500, alpha=0.01, random_stat
     X = prepare_feature(df_features_train_z)
     target = prepare_target(df_target_train)
 
-    beta = np.zeros((7,1))
+    beta = np.zeros((m+1,1))
 
     beta, J_storage = gradient_descent_linreg(X, target, beta, alpha, iterations)
-    return beta
+
+    pred = predict_linreg(df_features_test, beta)
+    target = prepare_target(df_target_test)
+    r2 = r2_score(target, pred)
+
+    return beta, r2
 
 def split_data_k_cross(df, random_state=None, k=10):
     
@@ -151,9 +156,10 @@ def split_data_k_cross(df, random_state=None, k=10):
     
     return folds
 
-def k_cross_validation(df, feature_col, target_col, k=10, iterations=1500, alpha=0.01):
-    folds = split_data_k_cross(df)
+def k_cross_validation(df, feature_col, target_col, k=10, iterations=1500, alpha=0.01, m=3, rs=100):
+    folds = split_data_k_cross(df, random_state=rs, k=k)
     beta_lst = []
+    r2lst = []
     ddfold = {}
     for i in range(k):
         ddfold[i] = pd.DataFrame(folds[i], columns=(target_col + feature_col))
@@ -180,21 +186,29 @@ def k_cross_validation(df, feature_col, target_col, k=10, iterations=1500, alpha
         X = prepare_feature(df_features_train_z)
         target = prepare_target(df_target_train)
 
-        beta = np.zeros((7,1))
+        beta = np.zeros((m+1,1))
 
         # Call the gradient_descent function
         beta, J_storage = gradient_descent_linreg(X, target, beta, alpha, iterations)
 
         # call the predict() method
         pred = predict_linreg(df_features_test, beta)
+        target = prepare_target(df_target_test)
+        r2 = r2_score(target, pred)
 
         beta_lst.append(beta)
-    return beta_lst
+        r2lst.append(r2)
+        
+    return beta_lst, r2lst
 
-df = pd.read_csv("2D_DATA.dev.csv")
-feature_col = ["TEMP", "TLU", "RAIN", "POP", "DEBT", "ECO"]
+df = pd.read_csv("2D_DATA_variation_2.csv")
+feature_col = ["POP", "TEMP", "FDI"]
 target_col = ["POC"]
-beta_l = k_cross_validation(df, feature_col, target_col, k=10, iterations=1500, alpha=0.01)
+beta_l, r2lst = k_cross_validation(df, feature_col, target_col, k=5, iterations=1500, alpha=0.01, rs=7, m=3)
 
-print(beta_l)
-print(len(beta_l))
+print(r2lst)
+print("===============================")
+
+beta, r2 = linreg(df, feature_col, target_col, random_state=100, test_size=0.3, sample=1, m=3)
+print(r2)
+print(beta)
