@@ -418,7 +418,7 @@ class CleanEverything(CleanerABC):
     
     def run(self):
         df_merged = self.cleanup()
-        df_merged.to_csv('2D_DATA.csv', index=False)
+        df_merged.to_csv('variation_1_2D_DATA.csv', index=False)
 
 
 if __name__ == '__main__':

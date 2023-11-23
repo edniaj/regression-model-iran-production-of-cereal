@@ -256,24 +256,18 @@ class RegressionModel(RegressionUtils, RegressionEvaluation):
         #["TEMP", "TLU", "RAIN", "POP", "DEBT", "ECO"]
         dict_to_dataframe = {
             'CONSTANT' : [],
+            'POP' : [],
             'TEMP' : [],
-            'TLU' : [],
-            'RAIN': [],
-            'POP': [],
-            'DEBT': [],
-            'ECO': [],
+            'FDI': [],
             'R2_SCORE': [],
             'MSE_SCORE': []
         }
         
         for index,each_beta_list in enumerate(new_array_beta):
             dict_to_dataframe['CONSTANT'].append(each_beta_list[0])
-            dict_to_dataframe['TEMP'].append(each_beta_list[1])
-            dict_to_dataframe['TLU'].append(each_beta_list[2])
-            dict_to_dataframe['RAIN'].append(each_beta_list[3])
-            dict_to_dataframe['POP'].append(each_beta_list[4])
-            dict_to_dataframe['DEBT'].append(each_beta_list[5])
-            dict_to_dataframe['ECO'].append(each_beta_list[6])
+            dict_to_dataframe['POP'].append(each_beta_list[1])
+            dict_to_dataframe['TEMP'].append(each_beta_list[2])
+            dict_to_dataframe['FDI'].append(each_beta_list[3])
             dict_to_dataframe['R2_SCORE'].append(self.list_r2_score[index])
             dict_to_dataframe['MSE_SCORE'].append(self.list_mean_square_error[index])
 
@@ -290,12 +284,14 @@ class RegressionModel(RegressionUtils, RegressionEvaluation):
         X = self.prepare_feature(df_features_train_z)
         target = self.prepare_target(df_target_train)
 
-        beta = np.zeros((m,1))
+        beta = np.zeros((m+1,1))
 
         beta, J_storage = self.gradient_descent_linreg(X, target, beta, alpha, iterations)
-        return beta
+        pred = self.predict_linreg(df_features_test, beta)
 
-    def split_data_k_cross(self,df, random_state=None, k=10):
+        return beta, df_features_test, df_target_test, pred
+
+    def split_data_k_cross(self, df, random_state=None, k=5):
         
         if random_state is not None:
             np.random.seed(random_state)
@@ -307,8 +303,8 @@ class RegressionModel(RegressionUtils, RegressionEvaluation):
         
         return folds
 
-    def k_cross_validation(self,df, feature_col, target_col,m, k=10, iterations=1500, alpha=0.01):
-        folds = self.split_data_k_cross(df)
+    def k_cross_validation(self,df, feature_col, target_col,m, k=10, iterations=1500, alpha=0.01, rs=100):
+        folds = self.split_data_k_cross(df, k=k, random_state=rs) #(data, number of splits, random_state)
         beta_lst = []
         ddfold = {}
         for i in range(k):
@@ -336,7 +332,7 @@ class RegressionModel(RegressionUtils, RegressionEvaluation):
             X = self.prepare_feature(df_features_train_z)
             target = self.prepare_target(df_target_train)
 
-            beta = np.zeros((m,1))
+            beta = np.zeros((m+1,1))
 
             # Call the gradient_descent function
             beta, J_storage = self.gradient_descent_linreg(X, target, beta, alpha, iterations)
@@ -353,23 +349,35 @@ class RegressionModel(RegressionUtils, RegressionEvaluation):
             beta_lst.append(beta)
         return beta_lst
 
-    def run_k_cross_validation(self):
+    def run_k_cross_validation(self, rs=100):
         
         df = pd.read_csv("variation_2_2D_DATA.csv")
         feature_col = ["POP", "TEMP", "FDI"]
         target_col = ["POC"]
-        beta_l = self.k_cross_validation(df, feature_col, target_col,m=3, k=10, iterations=1500, alpha=0.01)
+        beta_l = self.k_cross_validation(df, feature_col, target_col,m=3, k=5, iterations=10000, alpha=0.01, rs=rs)
         return beta_l
         
-    def build_csv_with_kfold(self):
+    def build_csv_with_kfold(self, rs=100):
         
-        beta_l = self.run_k_cross_validation()             
+        beta_l = self.run_k_cross_validation(rs)             
         self.write_beta_list_to_csv(beta_l)
-            
+
+    def run_linreg_with_plot(self):
+        df = pd.read_csv("variation_2_2D_DATA.csv")
+        feature_col = ["POP", "TEMP", "FDI"]
+        target_col = ["POC"]
+        beta, test, target, pred = self.linreg(df, feature_col, target_col, m=3, iterations=1500, alpha=0.01, random_state=100, test_size=0.2, sample=1)
+        
+        for name in feature_col:
+            plt.scatter(test[name], target)
+            plt.scatter(test[name], pred)
+            plt.show()
+                
             
 if __name__ == '__main__':
     '''
     We will use this module for out bonus page.
     Only run this function once for training the model. Do not run this if it's used as a module .
     '''
-    RegressionModel().build_csv_with_kfold()
+    RegressionModel().build_csv_with_kfold(rs=7) #I add argument "rs" means random state
+    RegressionModel().run_linreg_with_plot()

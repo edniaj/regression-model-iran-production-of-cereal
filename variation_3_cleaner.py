@@ -189,12 +189,10 @@ class UNStatCleaner(CleanerABC):
         # 1. Change population unites from 1 thousand to 1 million
         df_extract_POP['POP'] /=1000
 
-        print(df_extract_POP)
         
         # 2.  Ln it
         for index, row in df_extract_POP.iterrows():
             df_extract_POP.at[index, 'POP'] = math.log(row['POP'], math.e)
-        print(df_extract_POP)
         return df_extract_POP
 
     def cleanup(self):

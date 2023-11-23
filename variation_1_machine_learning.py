@@ -353,7 +353,7 @@ class RegressionModel(RegressionUtils, RegressionEvaluation):
         return beta_lst
 
     def run_k_cross_validation(self):
-            df = pd.read_csv("2D_DATA.csv")
+            df = pd.read_csv("variation_1_2D_DATA.csv")
             feature_col = ["TEMP", "TLU", "RAIN", "POP", "DEBT", "ECO"]
             target_col = ["POC"]
             beta_l = self.k_cross_validation(df, feature_col, target_col, k=10, iterations=1500, alpha=0.01)
