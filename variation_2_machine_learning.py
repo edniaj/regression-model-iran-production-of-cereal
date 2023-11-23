@@ -379,5 +379,5 @@ if __name__ == '__main__':
     We will use this module for out bonus page.
     Only run this function once for training the model. Do not run this if it's used as a module .
     '''
-    RegressionModel().build_csv_with_kfold(rs=7) #I add argument "rs" means random state
+    RegressionModel().build_csv_with_kfold(rs=None)
     RegressionModel().run_linreg_with_plot()

@@ -351,7 +351,7 @@ class RegressionModel(RegressionUtils, RegressionEvaluation):
 
     def run_k_cross_validation(self, rs=100):
         
-        df = pd.read_csv("variation_2_2D_DATA.csv")
+        df = pd.read_csv("variation_3_2D_DATA.csv")
         feature_col = ["POP", "TEMP", "FDI"]
         target_col = ["POC"]
         beta_l = self.k_cross_validation(df, feature_col, target_col,m=3, k=5, iterations=10000, alpha=0.01, rs=rs)
@@ -379,5 +379,5 @@ if __name__ == '__main__':
     We will use this module for out bonus page.
     Only run this function once for training the model. Do not run this if it's used as a module .
     '''
-    RegressionModel().build_csv_with_kfold(rs=7) #I add argument "rs" means random state
+    RegressionModel().build_csv_with_kfold(rs=None) 
     RegressionModel().run_linreg_with_plot()
