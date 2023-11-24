@@ -277,8 +277,8 @@ class RegressionModel(RegressionUtils, RegressionEvaluation):
             dict_to_dataframe['MSE_SCORE'].append(self.list_mean_square_error[index])
 
         df_k_fold = pd.DataFrame(dict_to_dataframe)        
-        print(df_k_fold)
-        df_k_fold.to_csv('k_fold.csv', index=False) 
+        print('Variation 1\n',df_k_fold,'\n')
+        df_k_fold.to_csv('variation_1_k_fold.csv', index=False) 
             
     def linreg(self, df, feature_col, target_col, iterations=1500, alpha=0.01, random_state=100, test_size=0.2, sample=1):
         df_features, df_target = (df.loc[:, feature_col].copy(), df.loc[:, target_col].copy())
